@@ -96,10 +96,12 @@ function MDGP_read(
     if iT > 0
         dadosT = readdlm(joinpath(dir,files[iT]))
         P[:,1:4] = Int64.(dadosT[:,2:5])
-        # recompute signs
-        @inbounds for i in 4:n
-            if P[i,4] != 0
-                P[i,4] = Int64(sign(omega(i,P,X')))
+        # recompute signs if X is available
+        if iX > 0
+            @inbounds for i in 4:n
+                if P[i,4] != 0
+                    P[i,4] = Int64(sign(omega(i,P,X')))
+                end
             end
         end
         torsion_angles = abs.(Float64.(dadosT[:,6:7]))
