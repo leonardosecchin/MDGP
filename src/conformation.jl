@@ -1,0 +1,271 @@
+# rotation matrix U w.r.t. the already positioned vertices l-3, l-2 and l-1
+# U = [ xx  yy  zz ]
+# with
+# xx = v1/|v1|
+# zz = v1 x v2/|v1 x v2|
+# yy = zz x xx
+# where
+# v1 = X[:,l-1] .- X[:,l-2]
+# v2 = X[:,l-3] .- X[:,l-2]
+# see Gonçalves, Mucherino. Discretization orders and efficient computation of cartesian coordinates for distance geometry. Optim Lett (2014) 8:2111-2125
+@inline function computeU!(U, X, l1, l2, l3)
+    @inbounds @views begin
+        @. U[1:3,1] = X[1:3,l1] - X[1:3,l2] #v1
+        @. U[1:3,3] = X[1:3,l3] - X[1:3,l2] #v2
+        U[1:3,3] .= cross(U[1:3,1], U[1:3,3]) #v1 x v2
+        U[1:3,2] .= cross(U[1:3,3], U[1:3,1]) #(v1 x v2) x v1
+        # normalize
+        U[1:3,1] ./= norm(U[1:3,1])
+        U[1:3,2] ./= norm(U[1:3,2])
+        U[1:3,3] ./= norm(U[1:3,3])
+    end
+end
+
+# construct the conformation according to 'fixed_torsions'
+function construct_conformation!(
+    l,
+    Dij, D, P, ij_to_D,
+    torsions,
+    X, fixed_torsions, adj,
+    work::WORKSPACE, maxtrials,
+    tol_lde, fixsign
+)
+
+    @inbounds @views if (l <= size(X,2))
+
+        # predecessors of l
+        l1, l2, l3 = P[l,1:3]
+
+        # distances
+        d10 = d(l1, l, D, ij_to_D)[1]   # exact
+        d20 = d(l2, l, D, ij_to_D)[1]   # exact
+        d21 = euclidean(X[1:3,l2], X[1:3,l1])   # l1 and l2 already positioned
+
+        # cosine/sine of the bond angle theta_l
+        costheta_l = costheta(d10, d20, d21)
+        sintheta_l = sqrt(1.0 - costheta_l^2)
+
+        # rotation matrix U w.r.t. vertices l-3, l-2, l-1
+        computeU!(work.U, X, l1, l2, l3)
+
+        ntrials = 0
+        besttorsion = fixed_torsions[l]
+        if maxtrials > 0
+            bestpartial_lde = compute_partial_lde(l, Dij, D, X, adj)
+        end
+
+        while (true)
+            if (ntrials >= maxtrials) && (ntrials > 0)
+                break
+            end
+
+            # cosine/sine of the torsion angle omega_l
+            omega_l = pi * fixed_torsions[l] / 180.0
+            cosomega_l = cos(omega_l)
+            sinomega_l = sin(omega_l)
+
+            X[1:3,l] .= X[1:3,l1] .+ d10*work.U*[-costheta_l ;
+                                                sintheta_l*cosomega_l ;
+                                                sintheta_l*sinomega_l ]
+
+            if maxtrials == 0
+                # just construct the conformation with the given angles
+                break
+            end
+
+            if (P[l,4] != 0) && (torsions[l,2] == 0)
+                # there is only possible angle, skip
+                break
+            end
+
+            # partial measure of quality
+            partial_lde = compute_partial_lde(l, Dij, D, X, adj)
+
+            # stop trials if LDE is small
+            if partial_lde <= tol_lde^2
+                break
+            end
+
+            if (P[l,4] == 0) && (torsions[l,2] == 0)
+                # there is two possibilities, so we just choose the other,
+                # which corresponds to flip the sign
+                if fixsign
+                    break
+                end
+                fixed_torsions[l] *= -1.0
+
+                # indicates that no retry is necessary
+                ntrials = maxtrials
+            else
+                # sort a new torsion angle
+                if fixsign
+                    sgn = Int64(sign(fixed_torsions[l]))
+                else
+                    sgn = (P[l,4] == 0) ? rand([-1,1]) : P[l,4]
+                end
+                fixed_torsions[l] = sort_torsion_angle(l, P, torsions, sgn)
+            end
+
+            if partial_lde < bestpartial_lde
+                # a better configuration was found
+                bestpartial_lde = partial_lde
+                besttorsion = fixed_torsions[l]
+            end
+            ntrials += 1
+        end
+
+        # best angle found so far
+        fixed_torsions[l] = besttorsion
+
+        # pass to the next level
+        construct_conformation!(l+1,
+                                Dij, D, P, ij_to_D, torsions,
+                                X, fixed_torsions, adj,
+                                work, maxtrials, tol_lde, fixsign
+                                )
+    else
+        # end of construction
+        return true
+    end
+end
+
+# try to improve a given conformation w.r.t. "objective" by flipping signs of given atoms
+function improve_conformation!(idxD, Dij, D, torsions, P, ij_to_D,
+                               X, fixed_torsions, adj,
+                               work, num_pass, tol_lde, maxtrials
+                               )
+
+    best_lde = LDE(Dij, D, idxD, X)
+
+    if best_lde <= tol_lde
+        return best_lde
+    end
+
+    @inbounds for pass in 1:num_pass
+        changed = false
+
+        # vertex from which we have to recompute the conformation
+        update_from_v = 4
+        recompute = false
+
+        for v in 4:length(fixed_torsions)
+            # Test whether the sign of the torsion angle can be flipped.
+            # This occurs when
+            #   P[v,4] = 0  OR
+            #   P[v,4] = 0  AND  minus "fixed torsion angle" lies in the torsion angle interval
+            if (P[v,4] != 0) &&
+               (
+               (-fixed_torsions[v] < P[v,4]*torsions[v,1] - torsions[v,2]) ||
+               (-fixed_torsions[v] > P[v,4]*torsions[v,1] + torsions[v,2])
+               )
+                continue
+            end
+
+            # flip sign
+            fixed_torsions[v] *= -1.0
+
+            # if the conformation is up to date, we only need to compute it from v
+            if !recompute
+                update_from_v = v
+            end
+
+            # reconstruct conformation from the last non udpated vertex
+            construct_conformation!(update_from_v,
+                                    Dij, D, torsions, P, ij_to_D,
+                                    X, fixed_torsions, adj,
+                                    work, maxtrials, tol_lde, true
+                                    )
+
+            new_lde = LDE(Dij, D, idxD, X)
+
+            if new_lde < best_lde
+                best_lde = new_lde
+                if new_lde <= tol_lde
+                    return new_lde
+                end
+                changed = true
+                recompute = false
+            else
+                # back to the previous conformation and indicate that
+                # the conformation should be recomputed from v in the next step
+                fixed_torsions[v] *= -1.0
+                update_from_v = v
+                recompute = true
+            end
+        end
+
+        # the conformation needs to be udpated; no torsion angle will be re-sorted
+        if recompute
+            construct_conformation!(update_from_v,
+                                    Dij, D, torsions, P, ij_to_D,
+                                    X, fixed_torsions, adj,
+                                    work, 0, tol_lde, true
+                                    )
+        end
+
+        if !changed
+            break
+        end
+    end
+    return best_lde
+end
+
+function start_conformation(nv, D, ij_to_D)
+    X = Matrix{Float64}(undef, 3, nv)
+
+    # construct first three points
+    d10 = d(2, 3, D, ij_to_D)[1]    # d_{3-1,3}   = d_{2,3}
+    d20 = d(1, 3, D, ij_to_D)[1]    # d_{3-2,3}   = d_{1,3}
+    d21 = d(1, 2, D, ij_to_D)[1]    # d_{3-2,3-1} = d_{1,2}
+
+    @inbounds X[1:3,1] .= 0.0
+    @inbounds X[1:3,2] .= [-d21; 0.0; 0.0]
+
+    costheta3 = costheta(d10, d20, d21)
+
+    @inbounds X[1:3,3] .= [
+              d10*costheta3 - d21;
+              d10*sqrt(1.0 - costheta3^2);
+              0.0
+              ]
+
+    return X
+end
+
+# partial LDE
+function compute_partial_lde(l, Dij, D, X, adj)
+    partial_lde = 0.0
+    @inbounds @views for k in adj[l]
+        dist = euclidean(X[1:3,l], X[1:3,Dij[k,1]])
+        L,U = D[k,1:2]
+        if L == U
+            partial_lde = max(partial_lde, abs(L - dist)/L)
+        else
+            partial_lde = max(partial_lde, max( max(L - dist, 0.0)/L, max(dist - U, 0.0)/U ) )
+        end
+    end
+    return partial_lde
+end
+
+function sort_torsion_angle(l, P, torsions, sgn)
+    # P[l,4] * torsion[l,1] is the center of the interval;
+    # torsion[l,2] is the shift from center, so the interval has length 2*torsion[l,2]
+
+    s = sgn * torsions[l,1]
+
+    if torsions[l,2] == 0.0
+        out = s
+    else
+        # sort an angle in the negative or positive part of the torsion interval
+        L = s - torsions[l,2]
+        U = s + torsions[l,2]
+        if sgn > 0.0
+            L = max(L, 0.0)
+        elseif sgn < 0.0
+            U = min(U, 0.0)
+        end
+        out = L + (U - L) * rand()
+    end
+
+    return out
+end

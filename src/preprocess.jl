@@ -1,0 +1,188 @@
+function init_P(P_orig, nv)
+    P = Matrix{Int64}(undef, nv, 4)
+    if isempty(P_orig)
+        # P was not provided. Consider the stardand DMDGP order
+        @views for i in 1:nv
+            P[i,1:4] .= [max(i-1,0); max(i-2,0); max(i-3,0); 0]
+        end
+    else
+        # DDGP order given by P
+        @views P[1:end,1:3] .= P_orig[1:end,1:3]
+        if size(P,2) >= 4
+            # the signs are provided
+            @views P[1:end,4] .= P_orig[1:end,4]
+        else
+            P[1:end,4] .= 0
+        end
+    end
+    return P
+end
+
+# perform basics tests on data
+function check_basics(Dij, D, P)
+
+    if size(D) != size(Dij)
+        @error "ERROR: Matrices D and Dij must have the same size."
+        return -1
+    end
+
+    if size(P) != (maximum(Dij),4)
+        @error "ERROR: P has an incorrect size."
+        return -1
+    end
+
+    @views if (minimum(P[4:end,1:3]) <= 0) || (maximum(abs.(P[4:end,4])) > 1)
+        @error "ERROR: P has incorrect entries."
+        return -1
+    end
+
+    for i in 1:size(P,1)
+        @views if (maximum(P[i,1:3]) >= i)
+            @error "ERROR: P has incorrect entries."
+            return -1
+        end
+    end
+
+    # Dij is a nx2 matrix with columns i, j
+    if size(Dij,2) != 2
+        @error "ERROR: Dij must be a #distances x 2 matrix with columns i, j."
+        return -1
+    end
+
+    # D is a nx2 matrix with columns lowerdij, upperdij
+    if size(D,2) != 2
+        @error "ERROR: D must be a #distances x 2 matrix with columns lower_dij, upper_dij."
+        return -1
+    end
+
+    # adjust Dij so that Dij[:,1] .< Dij[:,2] and verify if bounds are valid
+    @inbounds @views for i = 1:size(Dij,1)
+        if Dij[i,1] > Dij[i,2]
+            Dij[i,1:2] .= Dij[i,2:-1:1]
+        end
+        if (D[i,1] > D[i,2])
+            @error "ERROR: Invalid lower/upper bounds on distance between vertices $(Dij[i,1]) and $(Dij[i,2])."
+            return -1
+        end
+    end
+
+    return 0
+end
+
+# check if all necessary distances are provided
+function check_necessarydistances(nv, D, P, ij_to_D, tol_exact)
+    exact = (abs.(D[:,2] - D[:,1]) .<= tol_exact)
+
+    # exact distances ( d(i1,i) and d(i2,i) )
+    @inbounds @views for i = 3:nv
+        i1 = ij_to_D[i,P[i,1]]
+        i2 = ij_to_D[i,P[i,2]]
+
+        if (i1 <= 0) || !exact[i1]
+            println(i1,": ",D[i1,:])
+            @error "ERROR: Necessary exact distances from vertex $(i) were not provided."
+            return false
+        end
+        if (i2 <= 0) || !exact[i2]
+            println(i2,": ",D[i2,:])
+            @error "ERROR: Necessary exact distances from vertex $(i) were not provided."
+            return false
+        end
+    end
+
+    # distances d(i3,i) (exact or interval)
+    @inbounds @views for i = 4:nv
+        if ij_to_D[i,P[i,3]] <= 0
+            @error "ERROR: (Exact or Interval) distance between $(P[i,3]) and $(i) was not provided."
+            return false
+        end
+    end
+
+    return true
+end
+
+function consolidate_distances!(Dij, D)
+    idx = 1
+    @inbounds while (idx <= size(Dij,1))
+        # rows (> idx) that represent the same distance as row idx
+        @views same = ((Dij[1:end,1] .== Dij[idx,1]) .& (Dij[1:end,2] .== Dij[idx,2]))
+        same[1:idx] .= 0
+
+        # If two or more rows refer to a same distance, we take the tightest bound
+        if any(same)
+            # tightest bounds
+            D[idx,1] = maximum(D[same,1])
+            D[idx,2] = minimum(D[same,2])
+
+            # remove repeated rows
+            Dij = Dij[.!same,1:2]
+            D   = D[.!same,1:2]
+        end
+
+        # pass to the next row
+        idx += 1
+    end
+end
+
+function tight_bounds!(nv, D, P, ij_to_D, tol_exact, verbose)
+    if size(D,2) < 2
+        return 2
+    end
+
+    flag = 2
+    modified = true
+
+    while (modified)
+        modified = false
+        @inbounds @views for i = 4:nv
+            i3 = P[i,3]
+            k = ij_to_D[i3,i]
+
+            if D[k,2] - D[k,1] > tol_exact
+                i1 = P[i,1]
+                i2 = P[i,2]
+
+                d10 = d(i1, i,  D, ij_to_D)[1]
+                d20 = d(i2, i,  D, ij_to_D)[1]
+                d21 = d(i2, i1, D, ij_to_D)[1]
+                d31 = d(i3, i1, D, ij_to_D)[1]
+                d32 = d(i3, i2, D, ij_to_D)[1]
+
+                d30_0 = d30(d10, d32, d31, d21, d20, -1.0)
+                d30_1 = d30(d10, d32, d31, d21, d20,  1.0)
+
+                d30L = min(d30_0,d30_1)
+                d30U = max(d30_0,d30_1)
+
+                # lower bound
+                if D[k,1] < d30L
+                    if verbose > 1
+                        @printf("lower bound of d_%d,%d was improved from %.6lf to %.6lf\n",i3,i,D[k,1],d30L)
+                    end
+                    D[k,1] = d30L
+                    modified = true
+                end
+
+                # upper bound
+                if D[k,2] > d30U
+                    if verbose > 1
+                        @printf("upper bound of d_%d,%d was improved from %.6lf to %.6lf\n",i3,i,D[k,2],d30U)
+                    end
+                    D[k,2] = d30U
+                    modified = true
+                end
+
+                if D[k,1] > D[k,2]
+                    return 1
+                end
+
+                if D[k,2] - D[k,1] <= tol_exact
+                    D[k,1:2] .= (D[k,2] + D[k,1])/2
+                else
+                    flag = 0
+                end
+            end
+        end
+    end
+    return flag
+end
