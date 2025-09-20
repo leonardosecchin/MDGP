@@ -2,7 +2,7 @@
 
 This is an implementation of the multistart strategy to solve the Molecular Distance Geometry Problem (MDGP) with interval data, as described in
 
-[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025*]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
 
 ## Installation
 
@@ -35,7 +35,7 @@ This research was supported by the São Paulo Research Foundation (FAPESP) (gran
 
 If you use this code in your publications, please cite us. For now, you can cite the preprint:
 
-[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025*]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
 
 
 ## Scripts
