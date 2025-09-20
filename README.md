@@ -1,8 +1,8 @@
 # MDGP
 
-This is an implementation of the multistart strategy to solve the Molecular Distance Geometry Problem (MDGP), as described in
+This is an implementation of the multistart strategy to solve the Molecular Distance Geometry Problem (MDGP) with interval data, as described in
 
-[*(submitted). 2025*]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025*]()
 
 ## Installation
 
@@ -10,12 +10,20 @@ This is an implementation of the multistart strategy to solve the Molecular Dist
 
 ## Use
 
-### Generating instances from the Protein Data Bank (PDB)
+### Input files format
+
 
 
 ### Changing parameters
 
 For more details, run `?MDGP_multistart`.
+
+
+### Generating instances from the Protein Data Bank (PDB)
+
+You can generate instances from PDB by using the parser developed by Wagner da Rocha, written in Python.
+This parser return the distance and predecessor matrices, as well as the reference solution file.
+Please see [Wagner's Github page](https://github.com/wdarocha) for details.
 
 
 ## Funding
@@ -27,4 +35,15 @@ This research was supported by the São Paulo Research Foundation (FAPESP) (gran
 
 If you use this code in your publications, please cite us. For now, you can cite the preprint:
 
-[*(submitted). 2025*]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025*]()
+
+
+## Scripts
+
+You can download a script to reproduce tests with multistart algorithm [here](https://leonardosecchin.github.io/files/MDGPmultistart).
+Note that you must install `python3` and any required package, as well as additional Julia packages, yourself.
+
+
+## Acknowledgments
+
+Special thanks to Wagner da Rocha for his valuable insights during the development of this research and for developing the PDB parser.
