@@ -13,19 +13,35 @@ function omega(l, P, X)
 end
 
 """
-    X, Dij, D, P, res, atoms, torsions = MDGP_read(dir; fileid=1, model=1, chain='A')
+    X, Dij, D, P, residues, atoms, torsions = MDGP_read(Dfile, Pfile; Xfile = "", recompute_signs = true)
+
+Read an MDGP instance. Paths paths for distance (`Dfile`) and predecessor
+(`Pfile`) files must be provided. Optionally, a reference solution file
+(`Xfile`) can be specified. If given, signs in `Pfile` are recomputed when
+`recompute_signs = true`.
+
+## Output
+- `X`: reference solution `3 x |atoms|` matrix
+- `Dij`: `|distances| × 2` matrix with indices `(i, j)` for each distance `d_ij`
+- `D`: `|distances| × 2` matrix with lower and upper bounds for each distance
+- `P`: predecessor matrix
+- `residues`: residue index of each atom
+- `atoms`: atom types
+- `torsions`: `|atoms| × 2` matrix with reference torsion angles and their shifts
 """
 function MDGP_read(
-    dir::String;
-    fileid = 1,
-    model = 1,
-    chain = 'A'
+    Dfile::String, Pfile::String; Xfile::String = "", recompute_signs = true
 )
-    if !isdir(dir)
-        return [], [], [], [], [], [], []
-    end
+    Df = isfile(Dfile)
+    Pf = isfile(Pfile)
+    Xf = isfile(Xfile)
 
-    files = readdir(dir)
+    @assert Df "Invalid distance file"
+    @assert Pf "Invalid predecessor file"
+
+    if !isempty(Xfile) && !Xf
+        @warn "Solution file not found, ignoring..."
+    end
 
     Dij = []
     D = []
@@ -36,111 +52,65 @@ function MDGP_read(
     resnames = []
     angles = []
 
-    iI = 0
-    iX = 0
-    iT = 0
-    if fileid < 11
-        for i in 1:length(files)
-            if contains(files[i], "model$(model)_chain$(chain)") && contains(files[i], "ddgpHCorder$(fileid).dat")
-                if startswith(files[i], "I_")
-                    iI = i
-                elseif startswith(files[i], "X_")
-                    iX = i
-                elseif startswith(files[i], "T_")
-                    iT = i
-                end
-            end
-        end
-    else
-        for i in 1:length(files)
-            if contains(files[i], "model$(model)_chain$(chain)") && contains(files[i], "dmdgpHCorder.dat")
-                if startswith(files[i], "I_")
-                    iI = i
-                elseif startswith(files[i], "X_")
-                    iX = i
-                elseif startswith(files[i], "T_")
-                    iT = i
-                end
-            end
-        end
-    end
+    Ddata = readdlm(Dfile)
+    Pdata = readdlm(Pfile)
 
-    if iI > 0
-        dadosI = readdlm(joinpath(dir,files[iI]))
+    P = Int64.(Pdata[:,2:5])
+    Dij = Int64.([Ddata[:,2] Ddata[:,1]])   # the second indice is read first
 
-        # read columns of "I file"
-        D = Float64.([dadosI[:,5] dadosI[:,6]])
+    # reindex Dij and P
+    min_i = minimum(Dij)
+    Dij .-= min_i - 1
+    P[:,1:4] .-= min_i - 1
 
-        # Obs: the second indice is read first
-        Dij = Int64.([dadosI[:,2] dadosI[:,1]])
-        res = Int64.([dadosI[:,4] dadosI[:,3]])
-        atoms = [dadosI[:,8] dadosI[:,7]]
-        resnames = [dadosI[:,10] dadosI[:,9]]
-    else
-        @error "File 'I' not found."
-        return [], [], [], [], [], [], []
-    end
-
+    # number of atoms
     n = maximum(Dij)
 
-    if iX > 0
-        dadosX = readdlm(joinpath(dir,files[iX]))
+    @assert n == size(P,1) "Invalid predecessor list mismatch or non-consecutive atom indices"
 
-        X = Float64.(dadosX[:,1:3])
-    else
-        @warn "File 'X' not found."
+    D = Float64.([Ddata[:,5] Ddata[:,6]])
+    res = Int64.([Ddata[:,4] Ddata[:,3]])
+    atoms = [Ddata[:,8] Ddata[:,7]]
+    resnames = [Ddata[:,10] Ddata[:,9]]
+
+    # read the reference solution
+    if Xf
+        Xdata = readdlm(Xfile)
+        X = Matrix(Float64.(Xdata[:,1:3]'))
     end
 
-    P = Matrix{Int64}(undef, n, 4)
-
-    if iT > 0
-        dadosT = readdlm(joinpath(dir,files[iT]))
-        P[:,1:4] = Int64.(dadosT[:,2:5])
-        # recompute signs if X is available
-        if iX > 0
-            @inbounds for i in 4:n
-                if P[i,4] != 0
-                    P[i,4] = Int64(sign(omega(i,P,X')))
-                end
+    # recompute signs if X is available
+    if Xf && recompute_signs
+        @inbounds for i in 4:n
+            if P[i,4] != 0
+                P[i,4] = Int64(sign(omega(i,P,X)))
             end
         end
-        torsion_angles = abs.(Float64.(dadosT[:,6:7]))
-    else
-        @warn "File 'T' not found."
-
-        # P was not provided. Consider the DMDGP order
-        P = Matrix{Int64}(undef, n, 4)
-        @views for i in 1:n
-            P[i,1:4] .= [max(i-1,0); max(i-2,0); max(i-3,0); 0]
-        end
-        torsion_angles = zeros(n, 2)
     end
+    torsions = abs.(Float64.(Pdata[:,6:7]))
 
-    idxDpred = Int64[]      # between predecessors
-    idxDnonpred = Int64[]   # extra
-    idxDvdwc = Int64[]      # Van der Waals between consecutive residues
-    idxDvdwnc = Int64[]     # other Van der Waals
+    # read distances, dividing them by type
+    idxDpred = Int64[]      # diatances between predecessors
+    idxDnonpred = Int64[]   # other with lower and upper bounds
+    idxDvdw = Int64[]       # Van der Waals (only lower bound is present)
     @inbounds for k in 1:size(D,1)
         i,j = Dij[k,1:2]
         if (j in P[i,1:3]) || (i in P[j,1:3])
             push!(idxDpred, k)
         elseif D[k,2] < 900.0
             push!(idxDnonpred, k)
-        elseif abs(res[k,1] - res[k,2]) <= 1
-            push!(idxDvdwc, k)
         else
-            push!(idxDvdwnc, k)
+            push!(idxDvdw, k)
         end
     end
 
-    # sort distances
+    # sort
     TMP = sortslices([Dij D res atoms resnames][idxDpred,:], dims=1, by=row -> (row[2],row[1]))
     TMP = [TMP; sortslices([Dij D res atoms resnames][idxDnonpred,:], dims=1, by=row -> (row[2],row[1]))]
-    TMP = [TMP; sortslices([Dij D res atoms resnames][idxDvdwc,:], dims=1, by=row -> (row[2],row[1]))]
-    TMP = [TMP; sortslices([Dij D res atoms resnames][idxDvdwnc,:], dims=1, by=row -> (row[2],row[1]))]
+    TMP = [TMP; sortslices([Dij D res atoms resnames][idxDvdw,:], dims=1, by=row -> (row[2],row[1]))]
 
     Dij = Int64.(TMP[:,1:2])
-    D   = Float64.(TMP[:,3:4])
+    D = Float64.(TMP[:,3:4])
     res = Int64.(TMP[:,5:6])
     atoms = TMP[:,7:8]
     resnames = TMP[:,9:10]
@@ -149,9 +119,8 @@ function MDGP_read(
     D[ D .>= 900.0 ] .= Inf
 
     # map between atoms indices to their types and residues
-    atoms_map = Vector{String}(undef, n)
+    atoms_map = fill("?", n)
     res_map = zeros(Int64, n)
-    atoms_map .= "?"
     @inbounds @views for k in 1:size(Dij,1)
         atoms_map[Dij[k,1]] = strip(atoms[k,1])
         atoms_map[Dij[k,2]] = strip(atoms[k,2])
@@ -159,5 +128,5 @@ function MDGP_read(
         res_map[Dij[k,2]] = res[k,2]
     end
 
-    return Matrix(X'), Dij, D, P, res_map, atoms_map, torsion_angles
+    return X, Dij, D, P, res_map, atoms_map, torsions
 end

@@ -25,17 +25,72 @@ include("read.jl")
 # Main function
 ########################
 """
-    sols, types, ldes, mdes, time_init, time_total = MDGP_multistart(Dij, D, P, atoms, res, torsions; [OPTIONS])
+    sols, types, ldes, mdes, time_init, time_total = MDGP_multistart(Dij, D, P, atoms, torsions; [OPTIONS])
 
-Multistart strategy for MDGP.
+Multistart strategy for MDGP, as described in
+
+`Secchin ...`
+
+The MDGP instance data (`Dij`, `D`, `P`, `atoms`, `residues`, `torsions`)
+must be provided. See `MDGP_read` help.
+
+## Optional parameters and their default values
+- `N_sols`: number of solutions required (`1`)
+- `N_trial`: max number of initial trials (`500`)
+- `N_conf`: number of initial conformations (`50`)
+- `N_impr`: number of improvement trials (`5`)
+- `N_tors`: max number of torsion angles trials (`20`)
+- `N_similar`: max number of consecutive similar init conf (`50`)
+
+### Tolerances
+- `tol_lde`: tolerance for optimality (LDE) (`1e-3`)
+- `tol_mde`: tolerance for optimality (MDE) (`1e-3`)
+- `tol_stress`: tolerance for optimality (SPG, stress) (`1e-7`)
+- `tol_exact`: maximum interval length to consider a distance exact (`1e-12`)
+- `tol_similar`: tolerance to consider two conformations similar (`5.0`)
+
+### SPG options
+- `spg_maxit`: maximum number of SPG iterations (`30000`)
+- `spg_lacktol`: tolerance to declare lack of progress (`1e-8`)
+- `spg_eta`: Armijo's parameter (`1e-4`)
+- `spg_lsm`: length of the history for non-monotone line search (`10`)
+- `spg_lmin`: minimum value for spectral steplength (`1e-20`)
+- `spg_lmax`: maximum value for spectral steplength (`1e+20`)
+
+### Other
+- `max_time`: max time in seconds (`7200`)
+- `seed`: random seed (`<0` for any) (`-1`)
+- `verbose`: output level (`0` none, `1` normal, `2` detailed) (`1`)
+
+## Output
+- `sols`: list of conformations computed
+- `types`: vector of status of each conformation in `sols`:
+  - `-1`: infeasible
+  - `1`: feasible conformation computed before applying SPG
+  - `2`: feasible conformation computed after applying SPG
+- `ldes`: LDE of each conformation in `sols`
+- `mdes`: MDE of each conformation in `sols`
+- `time_init`: preprocessing time
+- `time_total`: total time
 """
 function MDGP_multistart(
             Dij_orig::Matrix{Int64},         # nd x 2 matrix of indices of distances
             D_orig::Matrix{Float64},         # nd x 2 matrix of distances
             P_orig::Matrix{Int64},           # predecessors and branching signs
             atoms::Vector{String},           # atoms names
-            res::Vector{Int64},              # residues indices
             torsions::Matrix{Float64};       # torsion angles and left/right displacements (in degrees)
+            N_sols::Int64        = 1,        # number of solutions required
+            N_trial::Int64       = 500,      # max number of initial trials
+            N_conf::Int64        = 50,       # number of initial conformations
+            N_impr::Int64        = 5,        # number of improvement trials
+            N_tors::Int64        = 20,       # max number of torsion angles trials
+            N_similar::Int64     = 50,       # max number of consecutive similar init conf
+            # tolerances
+            tol_lde::Real        = 1e-3,     # tolerance for optimality (LDE)
+            tol_mde::Real        = 1e-3,     # tolerance for optimality (MDE)
+            tol_stress::Real     = 1e-7,     # tolerance for optimality (SPG, stress)
+            tol_exact::Real      = 1e-12,    # maximum interval length to consider a distance exact
+            tol_similar::Real    = 5.0,      # tolerance to consider two conformations similar
             # SPG options
             spg_maxit::Int64     = 30000,    # maximum number of SPG iterations
             spg_lacktol::Real    = 1e-8,     # tolerance to declare lack of progress in SPG
@@ -43,29 +98,16 @@ function MDGP_multistart(
             spg_lsm::Int64       = 10,       # length of the history for non-monotone line search
             spg_lmin::Real       = 1e-20,    # minimum value for spectral steplength
             spg_lmax::Real       = 1e+20,    # maximum value for spectral steplength
-            # general options
-            num_X0::Int64        = 50,       # number of initial conformations
-            num_impr::Int64      = 5,        # number of improvement trials
-            max_init::Int64      = 500,      # max number of initial trials
-            max_torsion::Int64   = 20,       # max number of torsion angles trials
-            max_sols::Int64      = 1,        # number of solutions required
-            max_time::Real       = 7200,     # max time in seconds
-            max_similar::Int64   = 50,       # max number of consecutive similar init conf
-            # tolerances
-            tol_lde::Real        = 1e-3,     # tolerance for optimality (LDE)
-            tol_mde::Real        = 1e-3,     # tolerance for optimality (MDE)
-            tol_stress::Real     = 1e-7,     # tolerance for optimality (SPG, stress)
-            tol_exact::Real      = 1e-12,    # maximum interval length to consider a distance exact
-            tol_similar::Real    = 5.0,      # tolerance to consider two conformations equal (RMSD)
             # other
+            max_time::Real       = 7200,     # max time in seconds
             seed::Int64          = -1,       # random seed (<0 for any)
             verbose::Int64       = 1         # output level
             )
 
-    @assert num_X0 > 0 "num_X0 must be positive"
-    @assert max_init > 0 "max_init must be positive"
-    @assert max_torsion >= 0 "max_torsion must be non negative"
-    @assert max_sols > 0 "max_sols must be positive"
+    @assert N_conf > 0 "N_conf must be positive"
+    @assert N_trial > 0 "N_trial must be positive"
+    @assert N_tors >= 0 "N_tors must be non negative"
+    @assert N_sols > 0 "N_sols must be positive"
     @assert max_time > 0.0 "max_time must be positive"
 
     @assert spg_lsm > 0 "spg_lsm must be positive"
@@ -215,7 +257,7 @@ function MDGP_multistart(
     time_total = 0.0
     time_init = 0.0
 
-    while (length(sols) < num_X0) && (total_count < max_init)
+    while (length(sols) < N_conf) && (total_count < N_trial)
 
         time_initk = @elapsed begin
 
@@ -223,7 +265,7 @@ function MDGP_multistart(
             print("\rAttempt $(total_count), $(length(sols)) conformations found")
         end
 
-        if count(soltypes .>= 0) >= max_sols
+        if count(soltypes .>= 0) >= N_sols
             stop = true
             break
         end
@@ -238,18 +280,18 @@ function MDGP_multistart(
         @inbounds if construct_conformation!(4,
                                             Dij, D, P, ij_to_D, torsions,
                                             X, fixed_torsions, adj, work,
-                                            max_torsion, tol_lde, false
+                                            N_tors, tol_lde, false
                                             )
 
             total_count += 1
             # Try to improve the new conformation by minimizing LDE
             # Note that we can neglect discretization distances as
             # they will still be satisfied.
-            if num_impr > 0
+            if N_impr > 0
                 improve_conformation!(idxDprednonpred,
                                     Dij, D, P, ij_to_D, torsions,
-                                    X, fixed_torsions, adj, work, num_impr, tol_lde,
-                                    max_torsion
+                                    X, fixed_torsions, adj, work, N_impr, tol_lde,
+                                    N_tors
                                     )
             end
 
@@ -275,7 +317,7 @@ function MDGP_multistart(
                     consec_similar = 0
                 else
                     consec_similar += 1
-                    if consec_similar >= max_similar
+                    if consec_similar >= N_similar
                         # maximum number of consecutive trials with similar conformations
                         stop = true
                     end
