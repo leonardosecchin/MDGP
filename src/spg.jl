@@ -210,7 +210,7 @@ end
 function print_info(iter, sig, final, t)
     if (mod(iter,20000) == 0) && !(final)
         println()
-        println("  SPG it |     stress |          t |")
+        println("  SPG it |     stress | steplength |")
         println(" -----------------------------------")
     end
     if (mod(iter,1000) == 0) || (final)

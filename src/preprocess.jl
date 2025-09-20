@@ -12,53 +12,24 @@ end
 
 # perform basics tests on data
 function check_basics(Dij, D, P)
-
-    if size(D) != size(Dij)
-        @error "ERROR: Matrices D and Dij must have the same size."
-        return -1
-    end
-
-    if size(P) != (maximum(Dij),4)
-        @error "ERROR: P has an incorrect size."
-        return -1
-    end
-
-    @views if (minimum(P[4:end,1:3]) <= 0) || (maximum(abs.(P[4:end,4])) > 1)
-        @error "ERROR: P has incorrect entries."
-        return -1
-    end
+    @assert size(D) == size(Dij) "Matrices D and Dij must have the same size"
+    @assert size(P) == (maximum(Dij),4) "P has an incorrect size."
+    @assert (minimum(P[4:end,1:3]) > 0) && (maximum(abs.(P[4:end,4])) <= 1) "P has incorrect entries"
 
     for i in 1:size(P,1)
-        @views if (maximum(P[i,1:3]) >= i)
-            @error "ERROR: P has incorrect entries."
-            return -1
-        end
+        @assert (maximum(P[i,1:3]) < i) "P has incorrect entries"
     end
 
-    # Dij is a nx2 matrix with columns i, j
-    if size(Dij,2) != 2
-        @error "ERROR: Dij must be a #distances x 2 matrix with columns i, j."
-        return -1
-    end
-
-    # D is a nx2 matrix with columns lowerdij, upperdij
-    if size(D,2) != 2
-        @error "ERROR: D must be a #distances x 2 matrix with columns lower_dij, upper_dij."
-        return -1
-    end
+    @assert size(Dij,2) == 2 "Dij must be a #distances x 2 matrix with columns i, j"
+    @assert size(D,2) == 2 "D must be a #distances x 2 matrix with columns lower_dij, upper_dij"
 
     # adjust Dij so that Dij[:,1] .< Dij[:,2] and verify if bounds are valid
     @inbounds @views for i = 1:size(Dij,1)
         if Dij[i,1] > Dij[i,2]
             Dij[i,1:2] .= Dij[i,2:-1:1]
         end
-        if (D[i,1] > D[i,2])
-            @error "ERROR: Invalid lower/upper bounds on distance between vertices $(Dij[i,1]) and $(Dij[i,2])."
-            return -1
-        end
+        @assert (D[i,1] <= D[i,2]) "Invalid lower/upper bounds on distance between vertices $(Dij[i,1]) and $(Dij[i,2])"
     end
-
-    return 0
 end
 
 # check if all necessary distances are provided
@@ -69,30 +40,17 @@ function check_necessarydistances(nv, D, P, ij_to_D, tol_exact)
     @inbounds @views for i = 3:nv
         i1 = ij_to_D[i,P[i,1]]
         i2 = ij_to_D[i,P[i,2]]
-
-        if (i1 <= 0) || !exact[i1]
-            println(i1,": ",D[i1,:])
-            @error "ERROR: Necessary exact distances from vertex $(i) were not provided."
-            return false
-        end
-        if (i2 <= 0) || !exact[i2]
-            println(i2,": ",D[i2,:])
-            @error "ERROR: Necessary exact distances from vertex $(i) were not provided."
-            return false
-        end
+        @assert (i1 > 0) && exact[i1] "Necessary exact distances from vertex $(i) were not provided"
+        @assert (i2 > 0) && exact[i2] "Necessary exact distances from vertex $(i) were not provided"
     end
 
     # distances d(i3,i) (exact or interval)
     @inbounds @views for i = 4:nv
-        if ij_to_D[i,P[i,3]] <= 0
-            @error "ERROR: (Exact or Interval) distance between $(P[i,3]) and $(i) was not provided."
-            return false
-        end
+        @assert ij_to_D[i,P[i,3]] > 0 "Exact or interval distance between $(P[i,3]) and $(i) was not provided"
     end
-
-    return true
 end
 
+# consolidate repeated distances
 function consolidate_distances!(Dij, D)
     idx = 1
     @inbounds while (idx <= size(Dij,1))
@@ -116,12 +74,8 @@ function consolidate_distances!(Dij, D)
     end
 end
 
+# tight bounds, returning true if an infeasibility was identified
 function tight_bounds!(nv, D, P, ij_to_D, tol_exact, verbose)
-    if size(D,2) < 2
-        return 2
-    end
-
-    flag = 2
     modified = true
 
     while (modified)
@@ -165,16 +119,14 @@ function tight_bounds!(nv, D, P, ij_to_D, tol_exact, verbose)
                 end
 
                 if D[k,1] > D[k,2]
-                    return 1
+                    return true
                 end
 
                 if D[k,2] - D[k,1] <= tol_exact
                     D[k,1:2] .= (D[k,2] + D[k,1])/2
-                else
-                    flag = 0
                 end
             end
         end
     end
-    return flag
+    return false
 end

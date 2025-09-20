@@ -60,7 +60,7 @@ must be provided. See `MDGP_read` help.
 ### Other
 - `max_time`: max time in seconds (`7200`)
 - `seed`: random seed (`<0` for any) (`-1`)
-- `verbose`: output level (`0` none, `1` normal, `2` detailed) (`1`)
+- `verbose`: output level (`0` none, `1` normal, `2,3` detailed) (`1`)
 
 ## Output
 - `sols`: list of conformations computed
@@ -82,11 +82,11 @@ function MDGP_multistart(
             N_sols::Int64        = 1,        # number of solutions required
             N_trial::Int64       = 500,      # max number of initial trials
             N_conf::Int64        = 50,       # number of initial conformations
-            N_impr::Int64        = 5,        # number of improvement trials
+            N_impr::Int64        = 3,        # number of improvement trials
             N_tors::Int64        = 20,       # max number of torsion angles trials
             N_similar::Int64     = 50,       # max number of consecutive similar init conf
             # tolerances
-            tol_lde::Real        = 1e-3,     # tolerance for optimality (LDE)
+            tol_lde::Real        = 1e-2,     # tolerance for optimality (LDE)
             tol_mde::Real        = 1e-3,     # tolerance for optimality (MDE)
             tol_stress::Real     = 1e-7,     # tolerance for optimality (SPG, stress)
             tol_exact::Real      = 1e-12,    # maximum interval length to consider a distance exact
@@ -104,6 +104,7 @@ function MDGP_multistart(
             verbose::Int64       = 1         # output level
             )
 
+    # check parameters
     @assert N_conf > 0 "N_conf must be positive"
     @assert N_trial > 0 "N_trial must be positive"
     @assert N_tors >= 0 "N_tors must be non negative"
@@ -115,15 +116,13 @@ function MDGP_multistart(
     @assert spg_lmin > 0.0 "spg_lmin must be positive"
     @assert spg_lmax > 0.0 "spg_lmax must be positive"
 
-    @assert (tol_mde > 0.0) || (tol_lde > 0.0) "tol_lde or tol_lde must be positive"
+    @assert (tol_mde > 0.0) || (tol_lde > 0.0) "tol_mde or tol_lde must be positive"
     @assert tol_exact >= 0.0 "tol_exact must be positive"
     @assert tol_similar >= 0.0 "tol_similar must be non negative"
 
     if seed >= 0
         Random.seed!(seed)
     end
-
-    status = -1
 
     time_pre = @elapsed begin
 
@@ -133,11 +132,10 @@ function MDGP_multistart(
     # P has 4 columns: predecessors (cols 1 to 3) and branching signs (col 4)
     P = init_P(P_orig, maximum(Dij))
 
-    if check_basics(Dij, D, P) < 0
-        return [], [], [], [], Inf, Inf
-    end
+    # data consistency basic check
+    check_basics(Dij, D, P)
 
-    # Consolidate repeated distances
+    # consolidate repeated distances
     consolidate_distances!(Dij, D)
 
     # number of vertices and distances
@@ -152,19 +150,13 @@ function MDGP_multistart(
     ij_to_D = Symmetric(ij_to_D, :U)
 
     # check the existence of necessary distances
-    if !check_necessarydistances(nv, D, P, ij_to_D, tol_exact)
-        return [], [], [], [], Inf, Inf
-    end
+    check_necessarydistances(nv, D, P, ij_to_D, tol_exact)
 
-    # Try to improve d_{i-3,i} by computing it theoretically
-    flag = tight_bounds!(nv, D, P, ij_to_D, tol_exact, verbose)
-    if flag == 1
-        @error "Problem is infeasible!"
-        return [], [], [], [], Inf, Inf
-    elseif flag == 2
-        @warn "Instance is exact, enumerative strategies are recommended."
-        return [], [], [], [], Inf, Inf
-    end
+    # try to improve inexact distances
+    infeas = tight_bounds!(nv, D, P, ij_to_D, tol_exact, verbose)
+
+    @assert !infeas "Problem is infeasible"
+    @assert any(D[:,2] .> D[:,1]) "Instance is exact, enumerative strategies are recommended"
 
     # groups of distances
     idxDpred = Int64[]      # between predecessors
@@ -360,7 +352,7 @@ function MDGP_multistart(
                 push!(stress, spg_applied ? strs : Inf)
             end
 
-            if stop
+            if (lde <= tol_lde) || (mde <= tol_mde)
                 # X is feasible!
                 soltypes[end] = spg_applied ? 2 : 1
 
@@ -392,7 +384,6 @@ function MDGP_multistart(
         b = argmin(mdes)
         @printf("Minimum MDE among all conformations: %9.3e\n", mdes[b])
         @printf("LDE of the corresponding conformation: %9.3e\n", ldes[b])
-        @printf("Status of the corresponding conformation: %d\n", soltypes[b])
     end
 
     return sols, soltypes, ldes, mdes, time_init, time_total
