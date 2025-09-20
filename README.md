@@ -21,9 +21,15 @@ For more details, run `?MDGP_multistart`.
 
 ### Generating instances from the Protein Data Bank (PDB)
 
-You can generate instances from PDB by using the parser developed by Wagner da Rocha, written in Python.
-This parser return the distance and predecessor matrices, as well as the reference solution file.
+You can generate instances from the PDB using the parser developed by Wagner da Rocha, written in Python.
+This parser returns the distance and predecessor matrices, as well as the reference solution file.
 Please see [Wagner's Github page](https://github.com/wdarocha) for details.
+
+
+## Scripts
+
+You can download a script to reproduce the tests reported in the first reference using the multistart algorithm [here](https://leonardosecchin.github.io/files/MDGPmultistart).
+Note that you must install `python3` and any required package, as well as additional Julia packages, yourself.
 
 
 ## Funding
@@ -36,12 +42,6 @@ This research was supported by the São Paulo Research Foundation (FAPESP) (gran
 If you use this code in your publications, please cite us. For now, you can cite the preprint:
 
 [Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
-
-
-## Scripts
-
-You can download a script to reproduce tests with multistart algorithm [here](https://leonardosecchin.github.io/files/MDGPmultistart).
-Note that you must install `python3` and any required package, as well as additional Julia packages, yourself.
 
 
 ## Acknowledgments
