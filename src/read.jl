@@ -15,7 +15,7 @@ end
 """
     X, Dij, D, P, residues, atoms, torsions = MDGP_read(Dfile, Pfile; Xfile = "", recompute_signs = true)
 
-Read an MDGP instance. Paths paths for distance (`Dfile`) and predecessor
+Read an MDGP instance. Paths for distance (`Dfile`) and predecessor
 (`Pfile`) files must be provided. Optionally, a reference solution file
 (`Xfile`) can be specified. If given, signs in `Pfile` are recomputed when
 `recompute_signs = true`.
