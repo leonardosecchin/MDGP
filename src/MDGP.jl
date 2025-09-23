@@ -25,25 +25,36 @@ include("read.jl")
 # Main function
 ########################
 """
-    sols, types, ldes, mdes, time_init, time_total = MDGP_multistart(Dij, D, P, atoms, torsions; [OPTIONS])
+    sols, types, ldes, mdes, time_init, time_total = mdgp_multistart(Dij, D, P, atoms, torsions; [OPTIONS])
 
-Multistart strategy for MDGP, as described in
+The multistart strategy for MDGP described in
 
-`Secchin ...`
+`Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025`
 
-The MDGP instance data (`Dij`, `D`, `P`, `atoms`, `residues`, `torsions`)
-must be provided. See `MDGP_read` help.
+The MDGP instance data `Dij`, `D`, `P`, `atoms` and `torsions` must be provided.
+See `mdgp_read` help.
+
+## Output
+- `sols`: list of conformations computed
+- `types`: vector of status of each conformation in `sols`
+  - `-1`: infeasible
+  - `1`: feasible conformation computed before applying SPG
+  - `2`: feasible conformation computed after applying SPG
+- `ldes`: LDE of each conformation in `sols`
+- `mdes`: MDE of each conformation in `sols`
+- `time_init`: preprocessing time
+- `time_total`: total time
 
 ## Optional parameters and their default values
 - `N_sols`: number of solutions required (`1`)
 - `N_trial`: max number of initial trials (`500`)
 - `N_conf`: number of initial conformations (`50`)
-- `N_impr`: number of improvement trials (`5`)
+- `N_impr`: number of improvement trials (`3`)
 - `N_tors`: max number of torsion angles trials (`20`)
-- `N_similar`: max number of consecutive similar init conf (`50`)
+- `N_similar`: max number of consecutive similar initial conformations (`50`)
 
 ### Tolerances
-- `tol_lde`: tolerance for optimality (LDE) (`1e-3`)
+- `tol_lde`: tolerance for optimality (LDE) (`1e-2`)
 - `tol_mde`: tolerance for optimality (MDE) (`1e-3`)
 - `tol_stress`: tolerance for optimality (SPG, stress) (`1e-7`)
 - `tol_exact`: maximum interval length to consider a distance exact (`1e-12`)
@@ -61,17 +72,6 @@ must be provided. See `MDGP_read` help.
 - `max_time`: max time in seconds (`7200`)
 - `seed`: random seed (`<0` for any) (`-1`)
 - `verbose`: output level (`0` none, `1` normal, `2,3` detailed) (`1`)
-
-## Output
-- `sols`: list of conformations computed
-- `types`: vector of status of each conformation in `sols`:
-  - `-1`: infeasible
-  - `1`: feasible conformation computed before applying SPG
-  - `2`: feasible conformation computed after applying SPG
-- `ldes`: LDE of each conformation in `sols`
-- `mdes`: MDE of each conformation in `sols`
-- `time_init`: preprocessing time
-- `time_total`: total time
 """
 function mdgp_multistart(
             Dij_orig::Matrix{Int64},         # nd x 2 matrix of indices of distances

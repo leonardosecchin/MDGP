@@ -28,6 +28,16 @@ Read an MDGP instance. Paths for distance (`Dfile`) and predecessor
 - `residues`: residue index of each atom
 - `atoms`: atom types
 - `torsions`: `|atoms| × 2` matrix with reference torsion angles and their shifts
+
+## Example
+
+Download files `D_1TOS.dat` and `P_1TOS.dat` from
+
+`https://github.com/leonardosecchin/MDGP/tree/main/test`.
+
+From the same folder, run
+
+`_, Dij, D, P, residues, atoms, torsions = mdgp_read("D_1TOS.dat", "P_1TOS.dat")`
 """
 function mdgp_read(
     Dfile::String, Pfile::String; Xfile::String = "", recompute_signs = true

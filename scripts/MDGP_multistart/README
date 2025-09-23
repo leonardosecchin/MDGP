@@ -1,6 +1,6 @@
 To run tests, execute from Julia
 
-> include("tests.jl")
+> include("runtests.jl")
 > run_multistart()
 
 This will parse all PDB IDs listed in 'selected_probs' and then apply 'MDGP_multistart'
