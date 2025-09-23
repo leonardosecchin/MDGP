@@ -18,7 +18,7 @@ Problem (MDGP) with interval data, as described in
 ### Changing parameters
 
 You can change the algorithm parameters described in the reference paper. For details,
-run `?MDGP_multistart`.
+run `?mdgp_multistart`.
 
 
 ### Generating instances from the Protein Data Bank (PDB)
@@ -31,9 +31,9 @@ The parser will generate three files, starting with `I_`, `T_` and `X_`. The fir
 file (`Dfile`), the second contains the predecessors (`Pfile`) of each atom and the last the reference
 solution from PDB (`Xfile`). You can read them into Julia using
 
-`X, Dij, D, P, residues, atoms, torsions = MDGP_read("path to I_ file", "path to T_ file"; Xfile = "path to X_ file")`
+`X, Dij, D, P, residues, atoms, torsions = mdgp_read("path to I_ file", "path to T_ file"; Xfile = "path to X_ file")`
 
-For more details, run `?MDGP_read`.
+For more details, run `?mdgp_read`.
 
 
 ## Scripts
@@ -55,9 +55,3 @@ National Council for Scientific and Technological Development (CNPq) (grant 3025
 If you use this code in your publications, please cite us. For now, you can cite the preprint:
 
 [Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
-
-
-## Acknowledgments
-
-Special thanks to Wagner da Rocha for his valuable insights during the development of this research and
-for developing the PDB parser.

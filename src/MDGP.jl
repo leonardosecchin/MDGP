@@ -12,7 +12,7 @@ using Random
 using Distributions
 using DelimitedFiles
 
-export MDGP_multistart, MDGP_read
+export mdgp_multistart, mdgp_read
 
 include("vectors.jl")
 include("basic.jl")
@@ -73,7 +73,7 @@ must be provided. See `MDGP_read` help.
 - `time_init`: preprocessing time
 - `time_total`: total time
 """
-function MDGP_multistart(
+function mdgp_multistart(
             Dij_orig::Matrix{Int64},         # nd x 2 matrix of indices of distances
             D_orig::Matrix{Float64},         # nd x 2 matrix of distances
             P_orig::Matrix{Int64},           # predecessors and branching signs

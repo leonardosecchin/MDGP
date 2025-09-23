@@ -29,7 +29,7 @@ Read an MDGP instance. Paths for distance (`Dfile`) and predecessor
 - `atoms`: atom types
 - `torsions`: `|atoms| × 2` matrix with reference torsion angles and their shifts
 """
-function MDGP_read(
+function mdgp_read(
     Dfile::String, Pfile::String; Xfile::String = "", recompute_signs = true
 )
     Df = isfile(Dfile)
