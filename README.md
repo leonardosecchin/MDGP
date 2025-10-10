@@ -15,21 +15,19 @@ The basic usage is
 
 `mdgp_multistart(Dij, D, P, atoms, angles)`
 
-`Dij` is the `nd x 2` matrix of the indices `i,j` of the distances, where `nd`
-is the number of distances. `D` is the `nd x 2` matrix of corresponding
-distances intervals `[lower d_ij, upper d_ij]`. Entries of `Dij` are `Int64`,
-while those of `D` are `Float64`.
-
-`P` is a `nv x 4` matrix with `Int64` entries, where `nv` is the number of
+- `Dij` is the `nd x 2` matrix of the indices `i,j` of the distances, where `nd`
+is the number of distances.
+- `D` is the `nd x 2` matrix of corresponding distances intervals
+`[lower d_ij, upper d_ij]`. Entries of `Dij` are `Int64`, while those of `D`
+are `Float64`.
+- `P` is a `nv x 4` matrix with `Int64` entries, where `nv` is the number of
 atoms. `P[i,1:3]` are the indices of predecessors of atom `i` in descending
-order, while the fourth column `P[i,4]` contains `1`, `-1` or `0` indicating the
+order, while `P[i,4]` contains `1`, `-1` or `0` indicating the
 "side" that atom `i` is located with respect to the plane of its predecessors
 (quirality); when `P[i,4] = 0`, both sides are accepted.
-
-`atoms` is the `nv` vector of `String` containing the name of each atom (for
+- `atoms` is the `nv` vector of `String` containing the name of each atom (for
 example, "H1", "N", "CA", "HA", "C" and so on).
-
-`torsions` is a `nv x 2` matrix of `Float64`'s, whose i-th row `[w, delta]`
+- `torsions` is a `nv x 2` matrix of `Float64`'s, whose i-th row `[w, delta]`
 represents the torsion angle interval in the format `[w-delta, w+delta]` for
 atom `i`, in degrees. `w` must be non-negative (it sign is given by `P`).
 
