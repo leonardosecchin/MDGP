@@ -13,7 +13,7 @@ Distance Geometry Problem (MDGP) with interval data, as described in
 
 The basic usage is
 
-`mdgp_multistart(Dij, D, P, atoms, angles)`
+`mdgp_multistart(Dij, D, P, atoms, torsions)`
 
 - `Dij` is the `nd x 2` matrix of the indices `i,j` of the distances, where `nd`
 is the number of distances.
