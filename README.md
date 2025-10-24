@@ -3,7 +3,7 @@
 This is an implementation of the multistart strategy to solve the Molecular
 Distance Geometry Problem (MDGP) with interval data, as described in
 
-[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A hybrid combinatorial-continuous strategy for solving molecular distance geometry problems. 2025](https://arxiv.org/abs/2510.19970)
 
 ## Installation
 
@@ -35,22 +35,22 @@ For more details, run `?mdgp_multistart`.
 
 ### Changing parameters
 
-You can change the algorithm parameters described in the reference paper. For
-details, run `?mdgp_multistart`.
+You can modify the algorithm parameters described in the reference paper. For
+futher details, run `?mdgp_multistart`.
 
 ### Generating instances from the Protein Data Bank (PDB)
 
 You can generate instances from the [PDB](https://www.rcsb.org/) using the
-parser developed by Wagner da Rocha, written in Python. This parser returns the
+Python parser developed by Wagner da Rocha. This parser produces the
 distance and predecessor matrices, as well as the reference solution file. It is
-included in the folder `scripts/MDGP_multistart`. For more details and updates,
-please see [Wagner's Github page](https://github.com/wdarocha), in particular
-[this link](https://github.com/wdarocha/BP_Algorithms_for_iDDGP).
+included in the `scripts/MDGP_multistart` directory. For additional details and
+updates, please refer to [Wagner's Github page](https://github.com/wdarocha), in
+particular to [this link](https://github.com/wdarocha/BP_Algorithms_for_iDDGP).
 
-The parser will generate three files, starting with `I_`, `T_` and `X_`. The
+The parser generates three files, prefixed with `I_`, `T_` and `X_`. The
 first is the distance file (`Dfile`), the second contains the predecessors
-(`Pfile`) of each atom and the last the reference solution from PDB (`Xfile`).
-You can read them into Julia using
+(`Pfile`) of each atom, and the last provides the reference solution extracted
+from the PDB (`Xfile`). These files can be loaded into Julia using
 
 `X, Dij, D, P, residues, atoms, torsions = mdgp_read("path to I_ file", "path to T_ file"; Xfile = "path to X_ file")`
 
@@ -58,11 +58,11 @@ For more details, run `?mdgp_read`.
 
 ## Scripts
 
-Scripts for reproducing the tests reported in the references can be found in the
-`scripts` folder. The required packages for these scripts are not necessarily
-listed in the MDGP package dependencies. Therefore, you must install them
-manually. Also, you must install `python3` and any required package for the PDB
-parser, such as `MDAnalysis`.
+Scripts for reproducing the tests reported in the references are available in the
+`scripts` directory. Note that the packages required by these scripts are not
+necessarily included among the dependencies of the MDGP package, and therefore
+must be installed manually. In addition, `python3` and dependencies required by
+the Python parser (e.g. `MDAnalysis`) must also be installed.
 
 ## Funding
 
@@ -73,6 +73,6 @@ Development (CNPq) (grant 302520/2025-2), Brazil.
 ## How to cite
 
 If you use this code in your publications, please cite us. For now, you can cite
-the preprint:
+the preprint
 
-[Secchin, da Rocha, da Rosa, Liberti, Lavor. A fast heuristic for the molecular distance geometry problem. 2025]()
+[Secchin, da Rocha, da Rosa, Liberti, Lavor. A hybrid combinatorial-continuous strategy for solving molecular distance geometry problems. 2025](https://arxiv.org/abs/2510.19970)

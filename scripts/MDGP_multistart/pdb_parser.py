@@ -2740,8 +2740,6 @@ def cli_entry():
 	compute_phi_distances(ordered_file, pdb_path, pdb_id, model, chain, hc_order, angular_width, output_dir)
 	compute_psi_distances(ordered_file, pdb_path, pdb_id, model, chain, hc_order, angular_width, output_dir)
 	merge_intervals_from_output(pdb_id, model, chain, hc_order, output_dir)
-	#compute_phi_angles_to_file(pdb_path, pdb_id, model, chain, output_dir)
-	#compute_psi_angles_to_file(pdb_path, pdb_id, model, chain, output_dir)
 	compute_backbone_dihedrals_to_file(pdb_path, pdb_id, model, chain, output_dir)
 	
 	save_coordinates_file(ordered_file, pdb_id, model, chain, hc_order, output_dir)
@@ -2751,8 +2749,6 @@ def cli_entry():
 	fname_X = f"{output_dir}/X_{pdb_id}_model{model}_chain{chain}_{hc_order}.dat"
 	fname_T = f"{output_dir}/T_{pdb_id}_model{model}_chain{chain}_{hc_order}.dat"
 	
-	#add_edc_fileI(fname_I, fname_X)
-
 	copy_file_with_folder_up_two_levels(fname_I)
 	copy_file_with_folder_up_two_levels(fname_X)
 	copy_file_with_folder_up_two_levels(fname_T)
