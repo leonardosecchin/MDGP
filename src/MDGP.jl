@@ -243,7 +243,7 @@ function mdgp_multistart(
     # ======================
 
     if verbose > 0
-        println("\nComputing starting conformations...")
+        println("\nComputing initial conformations...")
     end
 
     time_total = 0.0
