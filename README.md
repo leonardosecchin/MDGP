@@ -18,18 +18,17 @@ The basic usage is
 - `Dij` is the `nd x 2` matrix of the indices `i,j` of the distances, where `nd`
 is the number of distances.
 - `D` is the `nd x 2` matrix of corresponding distances intervals
-`[lower d_ij, upper d_ij]`. Entries of `Dij` are `Int64`, while those of `D`
-are `Float64`.
-- `P` is a `nv x 4` matrix with `Int64` entries, where `nv` is the number of
+`[lower d_ij, upper d_ij]`.
+- `P` is a `nv x 4`, where `nv` is the number of
 atoms. `P[i,1:3]` are the indices of predecessors of atom `i` in descending
 order, while `P[i,4]` contains `1`, `-1` or `0` indicating the
 "side" that atom `i` is located with respect to the plane of its predecessors
 (quirality); when `P[i,4] = 0`, both sides are accepted.
-- `atoms` is the `nv` vector of `String` containing the name of each atom (for
-example, "H1", "N", "CA", "HA", "C" and so on).
-- `torsions` is a `nv x 2` matrix of `Float64`'s, whose i-th row `[w, delta]`
-represents the torsion angle interval in the format `[w-delta, w+delta]` for
-atom `i`, in degrees. `w` must be non-negative (it sign is given by `P`).
+- `atoms` is the `nv` vector containing the name of each atom (for example,
+"H1", "N", "CA", "HA", "C" and so on).
+- `torsions` the `nv x 2` matrix whose i-th row `[w, delta]` represents the
+torsion angle interval in the format `[w-delta, w+delta]` for atom `i`, in
+degrees. `w` must be non-negative (it sign is given by `P`).
 
 For more details, run `?mdgp_multistart`.
 
@@ -44,7 +43,7 @@ You can generate instances from the [PDB](https://www.rcsb.org/) using the
 Python parser developed by Wagner da Rocha. This parser produces the
 distance and predecessor matrices, as well as the reference solution file. It is
 included in the `scripts/MDGP_multistart` directory. For additional details and
-updates, please refer to [Wagner's Github page](https://github.com/wdarocha), in
+updates, please see [Wagner's Github page](https://github.com/wdarocha), in
 particular to [this link](https://github.com/wdarocha/BP_Algorithms_for_iDDGP).
 
 The parser generates three files, prefixed with `I_`, `T_` and `X_`. The
@@ -59,16 +58,16 @@ For more details, run `?mdgp_read`.
 ## Scripts
 
 Scripts for reproducing the tests reported in the references are available in the
-`scripts` directory. Note that the packages required by these scripts are not
+`scripts` folder. Note that the packages required by these scripts are not
 necessarily included among the dependencies of the MDGP package, and therefore
 must be installed manually. In addition, `python3` and dependencies required by
 the Python parser (e.g. `MDAnalysis`) must also be installed.
 
 ## Funding
 
-This research was supported by the São Paulo Research Foundation (FAPESP) (grant
-2024/12967-8) and the National Council for Scientific and Technological
-Development (CNPq) (grant 302520/2025-2), Brazil.
+This research was partially supported by the São Paulo Research Foundation
+(FAPESP) (grant 2024/12967-8) and the National Council for Scientific and
+Technological Development (CNPq) (grant 302520/2025-2), Brazil.
 
 ## How to cite
 
