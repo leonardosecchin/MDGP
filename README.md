@@ -21,12 +21,12 @@ is the number of distances.
 `[lower d_ij, upper d_ij]`.
 - `P` is a `nv x 4`, where `nv` is the number of
 atoms. `P[i,1:3]` are the indices of predecessors of atom `i` in descending
-order, while `P[i,4]` contains `1`, `-1` or `0` indicating the
+order, while `P[i,4]` is `1`, `-1` or `0`, indicating the
 "side" that atom `i` is located with respect to the plane of its predecessors
 (quirality); when `P[i,4] = 0`, both sides are accepted.
 - `atoms` is the `nv` vector containing the name of each atom (for example,
 "H1", "N", "CA", "HA", "C" and so on).
-- `torsions` the `nv x 2` matrix whose i-th row `[w, delta]` represents the
+- `torsions` is the `nv x 2` matrix whose i-th row `[w, delta]` represents the
 torsion angle interval in the format `[w-delta, w+delta]` for atom `i`, in
 degrees. `w` must be non-negative (it sign is given by `P`).
 
