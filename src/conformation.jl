@@ -50,9 +50,7 @@ function construct_conformation!(
 
         ntrials = 0
         besttorsion = fixed_torsions[l]
-        if maxtrials > 0
-            bestpartial_lde = compute_partial_lde(l, Dij, D, X, adj)
-        end
+        bestpartial_lde = Inf
 
         while (true)
             if (ntrials >= maxtrials) && (ntrials > 0)
@@ -86,6 +84,12 @@ function construct_conformation!(
                 break
             end
 
+            if partial_lde < bestpartial_lde
+                # a better configuration was found
+                bestpartial_lde = partial_lde
+                besttorsion = fixed_torsions[l]
+            end
+
             if (P[l,4] == 0) && (torsions[l,2] == 0)
                 # there is two possibilities, so we just choose the other,
                 # which corresponds to flip the sign
@@ -106,11 +110,6 @@ function construct_conformation!(
                 fixed_torsions[l] = sort_torsion_angle(l, P, torsions, sgn)
             end
 
-            if partial_lde < bestpartial_lde
-                # a better configuration was found
-                bestpartial_lde = partial_lde
-                besttorsion = fixed_torsions[l]
-            end
             ntrials += 1
         end
 
