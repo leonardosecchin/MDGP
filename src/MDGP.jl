@@ -17,7 +17,7 @@ include("param.jl")
 include("data.jl")
 include("check.jl")
 include("basic.jl")
-include("spg.jl")
+include("spg_raw.jl")
 include("conformation.jl")
 include("read.jl")
 

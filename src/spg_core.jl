@@ -18,7 +18,7 @@ end
 function init_spg_workspace(idxD, data::DATA, par::MDGP_PARAMETERS)
     nv = data.nv
     nd = data.nd
-    V() = SPGX_VECTOR(Matrix{Float64}(undef,3,nv), Vector{Float64}(undef,nd))
+    V() = SPG_VECTOR_EUC_RAW(Matrix{Float64}(undef,3,nv), Vector{Float64}(undef,nd))
     return SPG_WORKSPACE(
         consec_range(idxD),
         Vector{Float64}(undef,nd),   # w
@@ -38,26 +38,16 @@ end
 
 # Main function
 function spg(
-    data::DATA, par::MDGP_PARAMETERS, maxit, work::SPG_WORKSPACE, verbose;
-    # stress and its gradient
-    f::Function = stress,
-    g!::Function = grad_stress!,
-    # projected direction
-    proj_d!::Function = proj_d!,
-    # basic operations on vector structure
-    cp!::Function = SPGX_VECTOR_cp!,
-    xdoty::Function = SPGX_VECTOR_dot,
-    xpay!::Function = SPGX_VECTOR_XpaY!,
-    supn::Function = SPGX_VECTOR_supn
+    data::DATA, par::MDGP_PARAMETERS, maxit, work::SPG_WORKSPACE, verbose
 )
     # Note: in this function, the initial point is considered feasible w.r.t
     # box constraints
 
     # stress at the initial point
-    σ = f(data, work.x, work)
+    σ = stress(data, work.x, work)
 
     # stress gradient at the initial point
-    g!(data, work.x, work.g, work)
+    grad_stress!(data, work.x, work.g, work)
 
     # stress history
     work.lastσ .= -Inf
@@ -65,18 +55,18 @@ function spg(
 
     # save initial solution as the best
     σbest = σ
-    cp!(work.xbest, work.x, work)
+    spg_vector_cp!(work.xbest, work.x, work)
 
     # initial spectral steplength
-    tsmall = max(1e-7 * supn(work.x, work), 1e-10)
-    xpay!(work.xnew, work.x, -tsmall, work.g, work)
-    g!(data, work.xnew, work.gnew, work)
+    tsmall = max(1e-7 * spg_vector_supn(work.x, work), 1e-10)
+    spg_vector_xpay!(work.xnew, work.x, -tsmall, work.g, work)
+    grad_stress!(data, work.xnew, work.gnew, work)
 
-    xpay!(work.s, work.xnew, -1.0, work.x, work)
-    xpay!(work.y, work.gnew, -1.0, work.g, work)
+    spg_vector_xpay!(work.s, work.xnew, -1.0, work.x, work)
+    spg_vector_xpay!(work.y, work.gnew, -1.0, work.g, work)
 
-    ss = xdoty(work.s, work.s, work)
-    sy = xdoty(work.s, work.y, work)
+    ss = spg_vector_dot(work.s, work.s, work)
+    sy = spg_vector_dot(work.s, work.y, work)
 
     lambda = (sy <= 0.0) ? par.spg_lmax : min( par.spg_lmax, max(par.spg_lmin, ss/sy) )
 
@@ -105,7 +95,7 @@ function spg(
         if (iter >= maxit)
             (verbose > 2) && print_info(iter, σ, true, t)
 
-            cp!(work.x, work.xbest, work)
+            spg_vector_cp!(work.x, work.xbest, work)
             status = 3
             break
         end
@@ -114,17 +104,17 @@ function spg(
         prev_σ = σ
 
         # projected direction work.d = proj(x - lambda*g) - x
-        proj_d!(data, lambda, work)
+        proj_d!(data, work.d, lambda, work)
 
         # line search
         t = 1.0
 
         # first trial x + d
-        xpay!(work.xnew, work.x, 1.0, work.d, work)
-        σ = f(data, work.xnew, work)
+        spg_vector_xpay!(work.xnew, work.x, 1.0, work.d, work)
+        σ = stress(data, work.xnew, work)
 
         # g'*d
-        gtd = xdoty(work.g, work.d, work)
+        gtd = spg_vector_dot(work.g, work.d, work)
 
         while (σ > max_σ + t*par.spg_eta*gtd) && (t > tmin)
             if t <= 0.1
@@ -142,33 +132,33 @@ function spg(
             end
 
             # new trial
-            xpay!(work.xnew, work.x, t, work.d, work)
-            σ = f(data, work.xnew, work)
+            spg_vector_xpay!(work.xnew, work.x, t, work.d, work)
+            σ = stress(data, work.xnew, work)
         end
 
         # steplength is too small, no progress can be expected
         if t <= tmin
             (verbose > 2) && print_info(iter, σ, true, t)
 
-            cp!(work.x, work.xbest, work)
+            spg_vector_cp!(work.x, work.xbest, work)
             status = 4
             break
         else
             # gradient at Znew
-            g!(data, work.xnew, work.gnew, work)
+            grad_stress!(data, work.xnew, work.gnew, work)
 
             # new spectral steplength
-            xpay!(work.s, work.xnew, -1.0, work.x, work)
-            xpay!(work.y, work.gnew, -1.0, work.g, work)
+            spg_vector_xpay!(work.s, work.xnew, -1.0, work.x, work)
+            spg_vector_xpay!(work.y, work.gnew, -1.0, work.g, work)
 
-            ss = xdoty(work.s, work.s, work)
-            sy = xdoty(work.s, work.y, work)
+            ss = spg_vector_dot(work.s, work.s, work)
+            sy = spg_vector_dot(work.s, work.y, work)
 
             lambda = (sy <= 0.0) ? par.spg_lmax : min( par.spg_lmax, max(par.spg_lmin, ss/sy) )
 
             # x = xnew, g = gnew
-            cp!(work.x, work.xnew, work)
-            cp!(work.g, work.gnew, work)
+            spg_vector_cp!(work.x, work.xnew, work)
+            spg_vector_cp!(work.g, work.gnew, work)
         end
 
         # save the new stress value to the history
@@ -179,7 +169,7 @@ function spg(
         # best iterate found so far
         if σ < σbest
             σbest = σ
-            cp!(work.xbest, work.x, work)
+            spg_vector_cp!(work.xbest, work.x, work)
         end
 
         # lack of progress?

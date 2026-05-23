@@ -1,25 +1,30 @@
 ###############################
 # SPG for Euclidean coordinates
+# (raw stress)
 ###############################
 include("spg_core.jl")
 
 # point/vector structure
-struct SPGX_VECTOR
+struct SPG_VECTOR_EUC_RAW
     X::Matrix{Float64}
     d::Vector{Float64}
 end
 
 
-# Operations between SPGX_VECTORs
+# Operations between SPG_VECTOR_EUC_RAWs
 
 # Z = X
-function SPGX_VECTOR_cp!(Z::SPGX_VECTOR, X::SPGX_VECTOR, work::SPG_WORKSPACE)
+function spg_vector_cp!(
+    Z::SPG_VECTOR_EUC_RAW, X::SPG_VECTOR_EUC_RAW, work::SPG_WORKSPACE
+)
     Z.X .= X.X
     Z.d .= X.d
 end
 
 # dot(X,Y)
-function SPGX_VECTOR_dot(X::SPGX_VECTOR, Y::SPGX_VECTOR, work::SPG_WORKSPACE)
+function spg_vector_dot(
+    X::SPG_VECTOR_EUC_RAW, Y::SPG_VECTOR_EUC_RAW, work::SPG_WORKSPACE
+)
     r = dot(X.X, Y.X)
     @inbounds for k in work.idxD
         r += X.d[k] * Y.d[k]
@@ -28,8 +33,12 @@ function SPGX_VECTOR_dot(X::SPGX_VECTOR, Y::SPGX_VECTOR, work::SPG_WORKSPACE)
 end
 
 # Z = X + a*Y
-function SPGX_VECTOR_XpaY!(
-    Z::SPGX_VECTOR, X::SPGX_VECTOR, a::Float64, Y::SPGX_VECTOR, work::SPG_WORKSPACE
+function spg_vector_xpay!(
+    Z::SPG_VECTOR_EUC_RAW,
+    X::SPG_VECTOR_EUC_RAW,
+    a::Float64,
+    Y::SPG_VECTOR_EUC_RAW,
+    work::SPG_WORKSPACE
 )
     @. Z.X = X.X + a * Y.X
     @inbounds for k in work.idxD
@@ -38,7 +47,7 @@ function SPGX_VECTOR_XpaY!(
 end
 
 # supnorm(X)
-function SPGX_VECTOR_supn(X::SPGX_VECTOR, work::SPG_WORKSPACE)
+function spg_vector_supn(X::SPG_VECTOR_EUC_RAW, work::SPG_WORKSPACE)
     r = norm(X.X, Inf)
     @inbounds for k in work.idxD
         r = max(r, abs(X.d[k]))
@@ -47,20 +56,22 @@ function SPGX_VECTOR_supn(X::SPGX_VECTOR, work::SPG_WORKSPACE)
 end
 
 # projected direction
-function proj_d!(data::DATA, lambda::Float64, work::SPG_WORKSPACE)
-    @. work.d.X = -lambda * work.g.X
+function proj_d!(
+    data::DATA, d::SPG_VECTOR_EUC_RAW, lambda::Float64, work::SPG_WORKSPACE
+)
+    @. d.X = -lambda * work.g.X
     @inbounds for k in work.idxD
-        work.d.d[k] = -lambda * work.g.d[k]
+        d.d[k] = -lambda * work.g.d[k]
     end
 
     @inbounds @views for k in work.idxD
         L, U = data.D[k,1], data.D[k,2]
         xk = work.x.d[k]
-        aux = xk + work.d.d[k]
+        aux = xk + d.d[k]
         if aux < L
-            work.d.d[k] = L - xk
+            d.d[k] = L - xk
         elseif aux > U
-            work.d.d[k] = U - xk
+            d.d[k] = U - xk
         end
     end
 end
@@ -73,7 +84,7 @@ end
 # where i,j are the vertices corresponding to the k-th distance
 function stress(
     data::DATA,
-    x::SPGX_VECTOR,
+    x::SPG_VECTOR_EUC_RAW,
     work::SPG_WORKSPACE
 )
     σ = 0.0
@@ -82,13 +93,9 @@ function stress(
         i, j = data.Dij[k,1], data.Dij[k,2]
         work.dists[k] = d(i, j, x.X)
         σ += work.w[k] * (work.dists[k] - x.d[k])^2
-        if isnan(σ)
-            @show i,j
-            @show work.w[k]
-            @show x.d[k]
-            @show work.dists[k]
-            return
-        end
+    end
+    if isnan(σ)
+        error("stress returned NaN")
     end
 
     return σ/2.0
@@ -98,8 +105,8 @@ end
 # gradient of stress
 function grad_stress!(
     data::DATA,
-    x::SPGX_VECTOR,
-    g::SPGX_VECTOR,
+    x::SPG_VECTOR_EUC_RAW,
+    g::SPG_VECTOR_EUC_RAW,
     work::SPG_WORKSPACE
 )
     work.work .= 0.0
