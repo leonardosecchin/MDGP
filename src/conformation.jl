@@ -12,12 +12,24 @@
     @inbounds @views begin
         @. U[1:3,1] = X[1:3,l1] - X[1:3,l2] #v1
         @. U[1:3,3] = X[1:3,l3] - X[1:3,l2] #v2
+        v1_norm = norm(U[1:3,1])
+        v2_norm = norm(U[1:3,3])
+        check(
+            isfinite(v1_norm) && isfinite(v2_norm) && v1_norm > 0.0 && v2_norm > 0.0,
+            "Predecessor vertices must have finite, distinct coordinates"
+        )
         U[1:3,3] .= cross(U[1:3,1], U[1:3,3]) #v1 x v2
+        normal_norm = norm(U[1:3,3])
+        check(
+            isfinite(normal_norm) &&
+            normal_norm > sqrt(eps(Float64)) * v1_norm * v2_norm,
+            "Predecessor vertices must be affinely independent"
+        )
         U[1:3,2] .= cross(U[1:3,3], U[1:3,1]) #(v1 x v2) x v1
         # normalize
-        U[1:3,1] ./= norm(U[1:3,1])
+        U[1:3,1] ./= v1_norm
         U[1:3,2] ./= norm(U[1:3,2])
-        U[1:3,3] ./= norm(U[1:3,3])
+        U[1:3,3] ./= normal_norm
     end
 end
 
