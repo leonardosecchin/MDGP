@@ -40,9 +40,8 @@ function run_multistart()
         try
             Dfile = "$(dataset)/$(p)/I_$(p)_model1_chainA_ddgpHCorder1.dat"
             Pfile = "$(dataset)/$(p)/T_$(p)_model1_chainA_ddgpHCorder1.dat"
-            Xfile = "$(dataset)/$(p)/X_$(p)_model1_chainA_ddgpHCorder1.dat"
 
-            _, Dij, D, P, _, atoms, torsions = mdgp_read(Dfile, Pfile, Xfile=Xfile)
+            _, Dij, D, P, _, atoms, torsions = mdgp_read(Dfile, Pfile)
 
             # remove signs in P for "quasi-planar" atoms
             planarity!(Dij, P, torsions)
